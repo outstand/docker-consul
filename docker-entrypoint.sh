@@ -36,6 +36,19 @@ if [ -n "$CONSUL_CLIENT_INTERFACE" ]; then
   echo "==> Found address '$CONSUL_CLIENT_ADDRESS' for interface '$CONSUL_CLIENT_INTERFACE', setting client option..."
 fi
 
+# This is a hack to work around broken hostname support in rancherOS.
+CONSUL_NODE=
+if [ -n "$CONSUL_EC2_HOSTNAME" ]; then
+  CONSUL_NODE_NAME=$(wget -O - -q http://169.254.169.254/latest/meta-data/hostname)
+  if [ -z "$CONSUL_NODE_NAME" ]; then
+    echo "Could not find hostname via ec2 instance metadata, exiting"
+    exit 1
+  fi
+
+  CONSUL_NODE="-node=$CONSUL_NODE_NAME"
+  echo "==> Found hostname '$CONSUL_NODE_NAME', setting node option..."
+fi
+
 # CONSUL_DATA_DIR is exposed as a volume for possible persistent storage. The
 # CONSUL_CONFIG_DIR isn't exposed as a volume but you can compose additional
 # config files in there if you use this image as a base, or use CONSUL_LOCAL_CONFIG
@@ -63,6 +76,7 @@ if [ "$1" = 'agent' ]; then
         -config-dir="$CONSUL_CONFIG_DIR" \
         $CONSUL_BIND \
         $CONSUL_CLIENT \
+        $CONSUL_NODE \
         "$@"
 elif [ "$1" = 'version' ]; then
     # This needs a special case because there's no help output.
